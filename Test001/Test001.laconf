@@ -1,0 +1,20 @@
+﻿application 
+{
+	wave 
+	{
+		server 
+		{
+			prefix { name="http://+:9090/" }
+		}
+
+		dispatcher 
+		{
+			handler
+			{
+				type="NFX.Wave.Handlers.MVCHandler, NFX.Wave"  
+				type-location { assembly="Test001.exe" ns { name="Test001.Controllers" } }
+				match { path="/{type=Hello}/{mvc-action=Index}" }
+			}
+		}
+	}
+}

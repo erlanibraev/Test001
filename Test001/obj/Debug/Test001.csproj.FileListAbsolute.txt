@@ -1,0 +1,17 @@
+D:\projects\test\c#\Test001\Test001\bin\Debug\Test001.exe.config
+D:\projects\test\c#\Test001\Test001\bin\Debug\Test001.exe
+D:\projects\test\c#\Test001\Test001\bin\Debug\Test001.pdb
+D:\projects\test\c#\Test001\Test001\bin\Debug\NFX.dll
+D:\projects\test\c#\Test001\Test001\bin\Debug\NFX.Wave.dll
+D:\projects\test\c#\Test001\Test001\bin\Debug\NFX.Web.dll
+D:\projects\test\c#\Test001\Test001\bin\Debug\NFX.WinForms.dll
+D:\projects\test\c#\Test001\Test001\bin\Debug\NFX.xml
+D:\projects\test\c#\Test001\Test001\bin\Debug\NFX.Wave.xml
+D:\projects\test\c#\Test001\Test001\bin\Debug\NFX.Web.xml
+D:\projects\test\c#\Test001\Test001\bin\Debug\NFX.WinForms.xml
+D:\projects\test\c#\Test001\Test001\obj\Debug\Test001.Properties.Resources.resources
+D:\projects\test\c#\Test001\Test001\obj\Debug\Test001.csproj.GenerateResource.Cache
+D:\projects\test\c#\Test001\Test001\obj\Debug\Test001.exe
+D:\projects\test\c#\Test001\Test001\obj\Debug\Test001.pdb
+D:\projects\test\c#\Test001\Test001\bin\Debug\Test001.laconf
+D:\projects\test\c#\Test001\Test001\obj\Debug\Test001.csprojResolveAssemblyReference.cache

@@ -1,0 +1,3193 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>NFX.Erlang</name>
+    </assembly>
+    <members>
+        <member name="T:NFX.Erlang.ErlAbstractConnection">
+             <summary>
+             Maintains a connection between a C# process and a remote Erlang,
+             C# or C node. The object maintains connection state and allows
+             data to be sent to and received from the peer
+             </summary>
+             <remarks>
+             This abstract class provides the neccesary methods to maintain
+             the actual connection and encode the messages and headers in the
+             proper format according to the Erlang distribution protocol.
+             Subclasses can use these methods to provide a more or less
+             transparent communication channel as desired.
+            
+             Note that no receive methods are provided. Subclasses must
+             provide methods for message delivery, and may implement their own
+             receive methods.
+            
+             If an exception occurs in any of the methods in this class, the
+             connection will be closed and must be reopened in order to resume
+             communication with the peer. This will be indicated to the subclass
+             by passing the exception to its delivery() method
+             </remarks>
+        </member>
+        <member name="M:NFX.Erlang.ErlAbstractConnection.#ctor(NFX.Erlang.ErlLocalNode,NFX.Erlang.IErlTransport)">
+            <summary>
+            Accept an incoming connection from a remote node. Used by ErlLocalNode.Accept
+            to create a connection
+            based on data received when handshaking with the peer node, when
+            the remote node is the connection intitiator.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAbstractConnection.#ctor(NFX.Erlang.ErlLocalNode,NFX.Erlang.ErlRemoteNode,System.Nullable{NFX.Erlang.ErlAtom},System.Boolean)">
+            <summary>
+            Intiate and open a connection to a remote node
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAbstractConnection.Deliver(NFX.Erlang.ErlConnectionException)">
+            <summary>
+            Deliver communication exceptions to the recipient
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAbstractConnection.Deliver(NFX.Erlang.ErlMsg)">
+            <summary>
+            Deliver messages to the recipient
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAbstractConnection.Close">
+            <summary>
+            Close the connection to the remote node
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAbstractConnection.SendRPC(NFX.Erlang.ErlPid,System.String,System.String,NFX.Erlang.ErlList)">
+             <summary>
+             Send an RPC request to the remote Erlang node
+             </summary>
+             <param>mod the name of the Erlang module containing the function to be called</param>
+             <param>fun the name of the function to call</param>
+             <param>args a list of Erlang terms, to be used as arguments to the function</param>
+             <remarks>This convenience function creates the following message
+             and sends it to 'rex' on the remote node:
+            
+             <code>
+             { Self, { call, Mod, Fun, Args, user }}
+             </code>
+            
+             Note that this method has unpredicatble results if the remote
+             node is not an Erlang node
+             </remarks>
+        </member>
+        <member name="M:NFX.Erlang.ErlAbstractConnection.SendRPCcast(NFX.Erlang.ErlPid,System.String,System.String,NFX.Erlang.ErlList)">
+            <summary>
+            Send an RPC cast request to the remote Erlang node
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAbstractConnection.ReadSock(System.Byte[],System.Int32,System.Boolean)">
+            <summary>
+            Read data from socket
+            </summary>
+            <remarks>
+            This method now throws exception if we don't get full read
+            </remarks>
+        </member>
+        <member name="P:NFX.Erlang.ErlAbstractConnection.TraceLevel">
+            <summary>
+            Set the trace level for this connection. Normally tracing is off by default
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlAbstractConnection.SentBytes">
+            <summary>
+            Total number of bytes sent through connection
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlAbstractConnection.ReceivedBytes">
+            <summary>
+            Total number of bytes received from connection
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlAbstractConnection.SentMsgs">
+            <summary>
+            Total number of messages sent through connection
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlAbstractConnection.ReceivedMsgs">
+            <summary>
+            Total number of messages received from connection
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlAbstractConnection.SendCookie">
+            <summary>
+            Cookie to send along with each distribution message
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlAbstractConnection.MaxPayloadLength">
+            <summary>
+            Max size of the message accepted from the peer.
+            The connection will be closed if a message is received of size greater than this.
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlAbstractConnection.Connected">
+            <summary>
+            Determine if the connection is still alive. Note that this method
+            only reports the status of the connection, and that it is
+            possible that there are unread messages waiting in the receive
+            queue
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlAbstractNode">
+             <summary>
+             Represents an OTP node
+             </summary>
+             <remarks>
+             About nodenames: Erlang nodenames consist of two components, an
+             alivename and a hostname separated by '@'. Additionally, there are
+             two nodename formats: short and long. Short names are of the form
+             "alive@hostname", while long names are of the form
+             "alive@host.fully.qualified.domainname". Erlang has special
+             requirements regarding the use of the short and long formats, in
+             particular they cannot be mixed freely in a network of
+             communicating nodes, however Jinterface makes no distinction. See
+             the Erlang documentation for more information about nodenames.
+            
+             The constructors for the AbstractNode classes will create names
+             exactly as you provide them as long as the name contains '@'. If
+             the string you provide contains no '@', it will be treated as an
+             alivename and the name of the local host will be appended,
+             resulting in a shortname. Nodenames longer than 255 characters will
+             be truncated without warning.
+            
+             Upon initialization, this class attempts to read the file
+             .erlang.cookie in the user's home directory, and uses the trimmed
+             first line of the file as the default cookie by those constructors
+             lacking a cookie argument. If for any reason the file cannot be
+             found or read, the default cookie will be set to the empty string
+             (""). The location of a user's home directory is determined using
+             the system environment "HOME", which may not be automatically set
+             on all platforms
+             </remarks>
+        </member>
+        <member name="M:NFX.Erlang.ErlAbstractNode.#ctor(System.String,System.Boolean)">
+            <summary>
+            Create a node with the given name and the default cookie
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAbstractNode.#ctor(System.String,NFX.Erlang.ErlAtom,System.Boolean)">
+            <summary>
+            Create a node with the given name and cookie
+            </summary>
+            <param name="name">Node name in the form "name" or "name@hostname"</param>
+            <param name="cookie">Security cookie used to connect to this/other node(s)</param>
+            <param name="shortName">Use short/long host names</param>
+        </member>
+        <member name="M:NFX.Erlang.ErlAbstractNode.#ctor(System.String,NFX.Environment.IConfigSectionNode)">
+            <summary>
+            This constructor
+            </summary>
+            <param name="name"></param>
+            <param name="config"></param>
+        </member>
+        <member name="P:NFX.Erlang.ErlAbstractNode.NodeName">
+            <summary>
+            Get the name of this node (short or long depending on UseShortName)
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlAbstractNode.NodeLongName">
+            <summary>
+            Get the long name of this node
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlAbstractNode.Host">
+            <summary>
+            Get the hostname part of the nodename. Nodenames are composed of
+            two parts, an alivename and a hostname, separated by '@'. This
+            method returns the part of the nodename following the '@'
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlAbstractNode.AliveName">
+            <summary>
+            Get the alivename part of the hostname. Nodenames are composed of
+            two parts, an alivename and a hostname, separated by '@'. This
+            method returns the part of the nodename preceding the '@'
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlAbstractNode.Cookie">
+            <summary>
+            Get the authorization cookie used by this node
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlAbstractNode.Epmd">
+            <summary>
+            Get/Set the Epmd socket after publishing this nodes listen port to Epmd
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlAbstractNode.Port">
+            <summary>
+            Get the port number used by this node.
+            For local node the value may be 0 if the node was not registered with
+            the EPMD port mapper
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlConnection">
+            <summary>
+            Maintains a connection between a C# process and a remote
+            Erlang, C# or C node. The object maintains connection state and
+            allows data to be sent to and received from the peer
+            </summary>
+            <remarks>
+            In current implementation each connection creates a thread
+            </remarks>
+        </member>
+        <member name="M:NFX.Erlang.ErlConnection.#ctor(NFX.Erlang.ErlLocalNode,System.Net.Sockets.TcpClient)">
+            <summary>
+            Accept an incoming connection from a remote node
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlConnection.#ctor(NFX.Erlang.ErlLocalNode,NFX.Erlang.ErlRemoteNode,System.Boolean)">
+            <summary>
+            Intiate and open a connection to a remote node
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlConnection.Send(NFX.Erlang.ErlPid,NFX.Erlang.IErlObject)">
+            <summary>
+            Send an Erlang term to a Pid on a local or remote node
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlConnection.Deliver(NFX.Erlang.ErlConnectionException)">
+            <summary>
+            Deliver communication exceptions to the recipient
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlConnection.Deliver(NFX.Erlang.ErlMsg)">
+            <summary>
+            Deliver messages to the recipient
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlConnection.cookieError(NFX.Erlang.ErlLocalNode,NFX.Erlang.ErlAtom)">
+            <summary>
+            Send an auth error to peer because he sent a bad cookie
+            The auth error uses his cookie (not revealing ours).
+            This is just like send_reg otherwise
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlEpmd">
+             <summary>
+             Provides methods for registering, unregistering and looking up
+             nodes with the Erlang portmapper daemon (Epmd). For each registered
+             node, Epmd maintains information about the port on which incoming
+             connections are accepted, as well as which versions of the Erlang
+             communication protocolt the node supports
+             </summary>
+             <remarks>
+             Nodes wishing to contact other nodes must first request
+             information from Epmd before a connection can be set up, however
+             this is done automatically by
+             <see cref="M:NFX.Erlang.ErlLocalNode.Connection(System.String,System.Nullable{NFX.Erlang.ErlAtom})"/>
+             when necessary.
+            
+             The methods <see cref="M:NFX.Erlang.ErlEpmd.PublishPort(NFX.Erlang.ErlLocalNode)"/> and
+             <see cref="M:NFX.Erlang.ErlEpmd.UnPublishPort(NFX.Erlang.ErlLocalNode)"/> will fail if an
+             Epmd process is not running on the localhost. Additionally
+             <see cref="M:NFX.Erlang.ErlEpmd.LookupPort(NFX.Erlang.ErlLocalNode,NFX.Erlang.ErlRemoteNode,System.Boolean)"/> will fail if there is no Epmd
+             process running on the host where the specified node is running.
+             See the Erlang documentation for information about starting Epmd.
+            
+             This class contains only static methods, there are no
+             constructors.
+             </remarks>
+        </member>
+        <member name="M:NFX.Erlang.ErlEpmd.LookupPort(NFX.Erlang.ErlLocalNode,NFX.Erlang.ErlRemoteNode,System.Boolean)">
+            <summary>
+            Determine what port a node listens for incoming connections on
+            </summary>
+            <param name="home">Local node</param>
+            <param name="node">Remote lode for which to look up the port number from remote EPMD</param>
+            <param name="closeSocket">If true, close the connection to remote EPMD at return</param>
+            <returns>the listen port for the specified node, or 0 if the node
+            was not registered with Epmd</returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlEpmd.PublishPort(NFX.Erlang.ErlLocalNode)">
+             <summary>
+             Publish node's port at local EPMD, so that other nodes can connect to it.
+            
+             On failure to connect to EPMD the function may throw if the value of
+             ErlApp.IgnoreLocalEpmdConnectErrors variable is true.
+            
+             On failed connection attempt the function calls
+             node.OnEpmdFailedConnectAttempt delegate
+             </summary>
+             <remarks>
+             This function will get an exception if it tries to talk to an r3
+             epmd, or if something else happens that it cannot forsee. In both
+             cases we return an exception (and the caller should try again, using
+             the r3 protocol).
+            
+             If we manage to successfully communicate with an r4 epmd, we return
+             either the socket, or null, depending on the result
+             </remarks>
+        </member>
+        <member name="M:NFX.Erlang.ErlEpmd.UnPublishPort(NFX.Erlang.ErlLocalNode)">
+            <summary>
+            Unregister from Epmd.
+            Other nodes wishing to connect will no longer be able to
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlLink.HasPid">
+            <summary>
+            Returns true if this link points to a pid rather than to a node
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ReadWriteEventHandler">
+            <summary>
+            Delegate called on read/write from socket
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.MakeLocalNodeForThisAppOnThisHost">
+            <summary>
+            Makes local node name based on app id and local host name
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.#ctor(System.String,System.Boolean,System.Boolean)">
+            <summary>
+            Create a node with the given name and the default cookie
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.#ctor(System.String,NFX.Erlang.ErlAtom,System.Boolean,System.Boolean)">
+            <summary>
+            Create a node with the given name, cookie, and short name indicator
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlLocalNode.m_OnReadWrite">
+            <summary>
+            Delegate invoked on read/write from socket
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.RemoteNodeConfig(System.String)">
+            <summary>
+            Get configuration settings for a given remote node
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.Add(NFX.Erlang.ErlConnection)">
+            <summary>
+            Add a connection to collection
+            </summary>
+            <returns>Returns false if this connection was already previously added</returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.Remove(NFX.Erlang.ErlConnection)">
+            <summary>
+            Remove a connection from collection
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.CreateMbox(System.String)">
+            <summary>
+            Create a new named mailbox (emulates spawning a new Pid)
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.CreateMbox(NFX.Erlang.ErlAtom)">
+            <summary>
+            Create a new named mailbox (emulates spawning a new Pid)
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.CloseMbox(NFX.Erlang.ErlMbox)">
+            <summary>
+            Close the given mailbox
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.FindMbox(NFX.Erlang.ErlAtom)">
+            <summary>
+            Determine the mailbox corresponding to a
+            registered name on this <see cref="T:NFX.Erlang.ErlLocalNode"/>
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.Send(NFX.Erlang.ErlPid,NFX.Erlang.IErlObject)">
+            <summary>
+            Send a message to a remote <see cref="T:NFX.Erlang.ErlPid"/>, representing
+            either another <see cref="T:NFX.Erlang.ErlMbox"/> or an Erlang process
+            </summary>
+            <returns>true if message was sent successfully</returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.Send(NFX.Erlang.ErlPid,NFX.Erlang.ErlAtom,NFX.Erlang.ErlAtom,NFX.Erlang.IErlObject)">
+            <summary>
+            Send a message to a named mailbox on a given remote node
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.Send(NFX.Erlang.ErlPid,NFX.Erlang.ErlAtom,NFX.Erlang.IErlObject)">
+            <summary>
+            Send a message to a named mailbox on local node
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.CreateRef">
+            <summary>
+            Create an Erlang {@link Ref reference}. Erlang
+            references are based upon some node specific information; this
+            method creates a reference using the information in this node.
+            Each call to this method produces a unique reference
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.WaitAny(NFX.Erlang.ErlMbox[],System.Int32)">
+            <summary>
+            Wait for arrival of messages in any one of the given mailboxes
+            </summary>
+            <param name="mboxes">Mailboxes to wait for messages in</param>
+            <param name="msecTimeout">Timeout in milliseconds</param>
+            <returns>Index of the first non-empty mailbox or -1 on timeout</returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.DoStart">
+            <summary>
+            Start current node. This optionally creates a socket listener
+            and I/O server
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.BreakLinks(NFX.Erlang.ErlAtom,NFX.Erlang.IErlObject)">
+            <summary>
+            Break links of all pids linked to pids on the fromNode node
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.CreateNullPid(NFX.Erlang.ErlAtom)">
+            <summary>
+            Create an Erlang <see cref="T:NFX.Erlang.ErlPid"/> that belongs to current node
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.CreatePid">
+            <summary>
+            Create an Erlang <see cref="T:NFX.Erlang.ErlPid"/>. Erlang pids are based
+            upon some node specific information; this method creates a pid
+            using the information in this node. Each call to this method
+            produces a unique pid
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLocalNode.CreatePort">
+            <summary>
+            Create an Erlang <see cref="T:NFX.Erlang.ErlPort"/>. Erlang ports are
+            based upon some node specific information; this method creates a
+            port using the information in this node. Each call to this method
+            produces a unique port. It may not be meaningful to create a port
+            in a non-Erlang environment, but this method is provided for
+            completeness
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlLocalNode.Creation">
+            <summary>
+            Contains node creation bits that facilitate Pid uniqueness
+            upon node restart
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlLocalNode.AcceptConnections">
+            <summary>
+            If true local node will start a listener
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlLocalNode.AcceptAddressPort">
+            <summary>
+            Configuration Address and Port information for the listener in
+            the "address:port" format
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlLocalNode.GroupLeader">
+            <summary>
+            Mailbox for handling all I/O directed from remote nodes
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlLocalNode.TraceLevel">
+            <summary>
+            Set the trace level for this connection. Normally tracing is off by default
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlLocalNode.TraceToLog">
+            <summary>
+            Save trace events to log
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlLocalNode.LogUnhandledMsgs">
+            <summary>
+            Record unhandled msgs to log
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlLocalNode.AllNodeConfigs">
+            <summary>
+            Configs for remote nodes
+            </summary>
+        </member>
+        <member name="E:NFX.Erlang.ErlLocalNode.Trace">
+            <summary>
+            Trace callback executed if connection tracing is enabled
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlLocalNode.MboxFreelist">
+            <summary>
+            Cache of freed mailboxes that can be reused for RPC calls
+            </summary>
+            <remarks>This is needed because the unique Pid space is limited to 2^28</remarks>
+        </member>
+        <member name="T:NFX.Erlang.MailboxMsgEventHandler">
+            <summary>
+            Indicates arrival of a message to a given mailbox.
+            The msg is of type ErlMsg, ErlExit, ErlDown, or ErlException.
+            <returns>
+            If returns true, the message is handled, and will not be put in the mailbox's queue.
+            Otherwise, the message will be enqueued in the mailbox's queue.
+            </returns>
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlMbox">
+             <summary>
+             Provides a simple mechanism for exchanging messages with Erlang
+             processes or other instances of this class
+             </summary>
+             <remarks>
+             Each mailbox is associated with a unique <see cref="T:NFX.Erlang.ErlPid"/>
+             that contains information necessary for delivery of messages.
+             When sending messages to named processes or mailboxes, the sender
+             pid is made available to the recipient of the message. When sending
+             messages to other mailboxes, the recipient can only respond if the
+             sender includes the pid as part of the message contents. The sender
+             can determine his own pid by calling <see cref="P:NFX.Erlang.ErlMbox.Self"/>.
+            
+             Mailboxes can be named, either at creation or later. Messages
+             can be sent to named mailboxes and named Erlang processes without
+             knowing the <see cref="T:NFX.Erlang.ErlPid"/> that identifies the mailbox.
+             This is neccessary in order to set up initial communication between
+             parts of an application. Each mailbox can have at most one name.
+            
+             Messages to remote nodes are externalized for transmission, and
+             as a result the recipient receives a <b>copy</b> of the original
+             C# object. To ensure consistent behaviour when messages are sent
+             between local mailboxes, such messages are cloned before delivery.
+            
+             Additionally, mailboxes can be linked in much the same way as
+             Erlang processes. If a link is active when a mailbox is closed
+             any linked Erlang processes or ErlMbox's will be
+             sent an exit signal. As well, exit signals will be (eventually)
+             sent if a mailbox goes out of scope and its Dispose method called.
+             However due to the nature of
+             finalization (i.e. C# makes no guarantees about when Dispose
+             will be called) it is recommended that you
+             always explicitly close mailboxes if you are using links instead of
+             relying on finalization to notify other parties in a timely manner.
+            
+             When retrieving messages from a mailbox that has received an exit
+             signal, an <see cref="T:NFX.Erlang.ErlExit"/> exception will be
+             raised. Note that the exception is queued in the mailbox along with
+             other messages, and will not be raised until it reaches the head of
+             the queue and is about to be retrieved
+             </remarks>
+        </member>
+        <member name="M:NFX.Erlang.ErlMbox.#ctor(NFX.Erlang.ErlLocalNode,NFX.Erlang.ErlPid,System.String)">
+            <summary>
+            Create a mailbox with optional name
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlMbox.Register(System.String)">
+            <summary>
+            Register a name for this mailbox. Registering a
+            name for a mailbox enables others to send messages without
+            knowing the <see cref="T:NFX.Erlang.ErlPid"/> of the mailbox. A mailbox
+            can have at most one name; if the mailbox already had a name,
+            calling this method will supercede that name
+            </summary>
+            <returns>true if the name was available, or false otherwise</returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlMbox.ReceiveMatch(NFX.Erlang.IErlObject,System.Int32)">
+            <summary>
+            Receive a message and match it against a given pattern
+            </summary>
+            <param name="pattern">Pattern to match the message against</param>
+            <param name="timeoutMsec">Timeout in milliseconds</param>
+            <returns>Return a tuple containing the received message and variable
+            binding object. On timeout the first element of the tuple is null.
+            On unsuccessful match the second element of the tuple is null</returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlMbox.ReceiveMatch(NFX.Erlang.ErlPatternMatcher,System.Int32)">
+            <summary>
+            Receive a message and match it against a given pattern
+            </summary>
+            <param name="pm">Patterns to match the message against</param>
+            <param name="timeoutMsec">Timeout in milliseconds</param>
+            <returns>Return a tuple containing the received message and index of the
+            pattern in the pm instance that was successfully matched.
+            On timeout the 2nd element of the tuple is -2 and 1st element of the tuple is null.
+            On unsuccessful match the second element of the tuple is -1</returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlMbox.Receive(System.Int32)">
+            <summary>
+            Wait for a message to arrive for this mailbox. On timeout return null
+            </summary>
+            <param name="timeout">Timeout time in milliseconds</param>
+            <returns></returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlMbox.Send(NFX.Erlang.ErlAtom,NFX.Erlang.ErlAtom,NFX.Erlang.IErlObject)">
+            <summary>
+            Send a message to a named mailbox created from another node
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlMbox.AsyncRPC(NFX.Erlang.ErlAtom,NFX.Erlang.ErlAtom,NFX.Erlang.ErlAtom,NFX.Erlang.ErlList,NFX.Erlang.IErlObject,System.Nullable{NFX.Erlang.ErlAtom})">
+            <summary>
+            Send RPC call to a given node.
+            </summary>
+            <param name="node">Destination node for this RPC call</param>
+            <param name="mod">Module name to call</param>
+            <param name="fun">Function name to call</param>
+            <param name="args">Function arguments</param>
+            <param name="ioServer">Either a PID or an Atom containing registered I/O server's name.</param>
+            <param name="remoteCookie">Remote cookie</param>
+        </member>
+        <member name="M:NFX.Erlang.ErlMbox.Link(NFX.Erlang.ErlPid)">
+             <summary>
+             Link to a remote mailbox or Erlang process. Links are
+             idempotent, calling this method multiple times will not result in
+             more than one link being created
+             </summary>
+             <remarks>
+             If the remote process subsequently exits or the mailbox is
+             closed, a subsequent attempt to retrieve a message through this
+             mailbox will cause an {@link Exit Exit}
+             exception to be raised. Similarly, if the sending mailbox is
+             closed, the linked mailbox or process will receive an exit
+             signal.
+            
+             If the remote process cannot be reached in order to set the
+             link, the exception is raised immediately.
+             </remarks>
+        </member>
+        <member name="M:NFX.Erlang.ErlMbox.Unlink(NFX.Erlang.ErlPid)">
+            <summary>
+            Remove a link to a remote mailbox or Erlang process. This
+            method removes a link created with <see cref="T:NFX.Erlang.ErlLink"/>
+            Links are idempotent; calling this method once will remove all
+            links between this mailbox and the remote <see cref="T:NFX.Erlang.ErlPid"/>
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlMbox.Equals(System.Object)">
+            <summary>
+            Determine if two mailboxes are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlMbox.Close">
+             <summary>
+             Close this mailbox
+             </summary>
+             <remarks>
+             After this operation, the mailbox will no longer be able to
+             receive messages. Any delivered but as yet unretrieved messages
+             can still be retrieved however.
+            
+             If there are links from this mailbox to other <see cref="T:NFX.Erlang.ErlPid"/>
+             pids they will be broken when this method is
+             called and exit signals will be sent.
+             </remarks>
+        </member>
+        <member name="M:NFX.Erlang.ErlMbox.Deliver(NFX.Erlang.ErlMsg)">
+            <summary>
+            Called to deliver message to this mailbox
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlMbox.BreakLinks(NFX.Erlang.ErlAtom,NFX.Erlang.IErlObject)">
+            <summary>
+            Used to break all known links to this mbox
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlMbox.BreakLinks(NFX.Erlang.ErlAtom)">
+            <summary>
+            Used to break all known links to this mbox
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlMbox.receiveBuf">
+            <summary>
+            Block until a message arrives for this mailbox
+            </summary>
+            <returns>a stream representing the still-encoded body of the next
+            message waiting in this mailbox</returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlMbox.receiveBuf(System.Int32)">
+            <summary>
+            Wait for a message to arrive for this mailbox
+            </summary>
+            <param name="timeout">time in milliseconds</param>
+            <returns>a stream representing the still-encoded body of the next
+            message waiting in this mailbox, or null on timeout</returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlMbox.receiveMsg(System.Int32)">
+            <summary>
+            Receive a message complete with sender and recipient information
+            from a remote process. This method blocks at most for the specified
+            time, until a valid message is received or an exception is raised
+            </summary>
+            <param name="timeout">Time in milliseconds</param>
+            <returns>Erlang distributed message or null on timeout</returns>
+        </member>
+        <member name="E:NFX.Erlang.ErlMbox.MailboxMessage">
+            <summary>
+            If this event is assigned, it will be called on arrival of a message, but
+            the messages will not be put in the queue
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlMbox.Self">
+            <summary>
+            Get the Pid identifying associated with this mailbox
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlMbox.Name">
+            <summary>
+            Get the registered name of this mailbox, or string.Empty if the
+            mailbox doesn't have a registered name
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="P:NFX.Erlang.ErlMbox.Empty">
+            <summary>
+            Return true if there are no messages waiting in the receive queue
+            of this connection
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlMbox.MsgCount">
+            <summary>
+            Return the number of messages currently waiting in the receive
+            queue of this connection
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlMbox.Handle">
+            <summary>
+            Queue not empty status notification handle
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlMbox.LastUsed">
+            <summary>
+            Timestamps when this mailbox was last used - this is used internally
+            by mailbox caching
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.IQueable">
+            <summary>
+            Represents a interface that messages enqueued to ErlMbox must support
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlMsg">
+             <summary>
+             Provides a distributed carrier for Erlang messages
+             </summary>
+             <remarks>
+             Instances of this class are created to package header and
+             payload information in received Erlang messages so that the
+             recipient can obtain both parts with a single call to
+             <see cref="M:NFX.Erlang.ErlMbox.receiveMsg"/>
+            
+             The header information that is available is as follows:
+             <ul>
+             <li>a tag indicating the type of message</li>
+             <li>the intended recipient of the message, either as a
+                 <see cref="T:NFX.Erlang.ErlPid"/> or as a <see cref="T:NFX.Erlang.ErlAtom"/>, but never both.</li>
+             <li>(sometimes) the sender of the message. Due to some eccentric
+                 characteristics of the Erlang distribution protocol, not
+                 all messages have information about the sending process. In
+                 particular, only messages whose tag is <see cref="F:NFX.Erlang.ErlMsg.Tag.RegSend"/>
+                 contain sender information.</li>
+             </ul>
+            
+             Message are sent using the Erlang external format (see separate
+             documentation). When a message is received and delivered to the
+             recipient <see cref="T:NFX.Erlang.ErlMbox"/>, the body of the message is still
+             in this external representation until <see cref="P:NFX.Erlang.ErlMsg.Msg"/>
+             is called, at which point the message is decoded. A copy of the
+             decoded message is stored in the OtpMsg so that subsequent calls to
+             <see cref="P:NFX.Erlang.ErlMsg.Msg"/> do not require that the message be decoded
+             a second time.
+             </remarks>
+        </member>
+        <member name="F:NFX.Erlang.ErlMsg.Type">
+            <summary>
+            The type of message
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlMsg.Ref">
+            <summary>
+            Returns reference contained in this message
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlMsg.Reason">
+            <summary>
+            Reason associated with some messages
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlMsg.Cookie">
+            <summary>
+            Contains cookie if it is to be sent or was received in the message
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlMsg.TraceToken">
+            <summary>
+            Trace token delivered in the message
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlMsg.Paybuf">
+            <summary>
+            The payload of this deserialized message
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlMsg.Msg">
+            <summary>
+            Deserialized Erlang message contained in this instance
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlMsg.RecipientName">
+            <summary>
+            Get the name of the recipient for this message
+            </summary>
+            <remarks>
+            Messages are sent to Pids or names. If this message was sent
+            to a name then the name is returned by this method
+            </remarks>
+        </member>
+        <member name="P:NFX.Erlang.ErlMsg.RecipientPid">
+            <summary>
+            Get the Pid of the recipient for this message, if it is a Send message
+            </summary>
+            <remarks>
+            Messages are sent to Pids or names. If this message was sent
+            to a Pid then the Pid is returned by this method. The recipient
+            Pid is also available for link, unlink and exit messages
+            </remarks>
+        </member>
+        <member name="P:NFX.Erlang.ErlMsg.Recipient">
+            <summary>
+            Get the recipient for this message, as a Pid or a registered name (Atom)
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlMsg.SenderPid">
+            <summary>
+            Returns pid of the sender (may be empty, i.e. SenderPid.Empty == true)
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlMsg.Sender">
+            <summary>
+            Get the sender for this message, as a Pid or a registered name (Atom)
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlMsg.HasSender">
+            <summary>
+            Returns true if the message has a non-empty sender
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlMsg.Tag">
+            <summary>
+            Erlang message header tags
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlRemoteNode.#ctor(NFX.Erlang.ErlLocalNode)">
+            <summary>
+            Constructor used for creating a remote node by the Acceptor of incoming connections
+            </summary>
+            <param name="home"></param>
+        </member>
+        <member name="M:NFX.Erlang.ErlRemoteNode.#ctor(NFX.Erlang.ErlLocalNode,System.String,System.Nullable{NFX.Erlang.ErlAtom})">
+            <summary>
+            Create a peer node
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlRemoteNode.#ctor(NFX.Erlang.ErlLocalNode,NFX.Erlang.ErlAtom,System.Nullable{NFX.Erlang.ErlAtom})">
+            <summary>
+            Create a peer node
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlRemoteNode.#ctor(NFX.Erlang.ErlLocalNode,NFX.Erlang.ErlAtom,NFX.Environment.IConfigSettings,System.Nullable{NFX.Erlang.ErlAtom})">
+            <summary>
+            Create a peer node
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlRemoteNode.Connect(NFX.Erlang.ErlLocalNode)">
+            <summary>
+            Create a connection to a remote node
+            </summary>
+            <param name="self">the local node from which you wish to connect</param>
+            <returns>A connection to the remote node</returns>
+        </member>
+        <member name="P:NFX.Erlang.ErlRemoteNode.TransportClassName">
+            <summary>
+            Full name of transport class (if not specified - it uses ErlTcpTransport)
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlRemoteNode.SSHServerPort">
+            <summary>
+            Port of SSH server
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlRemoteNode.SSHUserName">
+            <summary>
+            SSH user name
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlRemoteNode.SSHPrivateKeyFilePath">
+            <summary>
+            Private key file path (only for AuthenticationType = PublicKey)
+            Required SSH2 ENCRYPTED PRIVATE KEY format.
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlRemoteNode.ConnectTimeout">
+            <summary>
+            Connect timeout, ms
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlRemoteNode.SSHAuthenticationType">
+            <summary>
+            Type of auth on SSH server
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlTraceLevel.Off">
+            <summary>
+            Tracing is off
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlTraceLevel.Send">
+            <summary>
+            Trace ordinary send and receive messages
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlTraceLevel.Ctrl">
+            <summary>
+            Trace control messages (e.g. link/unlink)
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlTraceLevel.Handshake">
+            <summary>
+            Trace handshaking at connection startup
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlTraceLevel.Epmd">
+            <summary>
+            Trace Epmd connectivity
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlTraceLevel.Wire">
+            <summary>
+            Trace wire-level message content
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.TraceEventHandler">
+            <summary>
+            Debugging delegate called to be able to record transport-related events
+            </summary>
+            <param name="sender">Event sender</param>
+            <param name="type">Type of trace event</param>
+            <param name="dir">Event direction (in/out-bound)</param>
+            <param name="message">Event detail</param>
+        </member>
+        <member name="T:NFX.Erlang.ErlTcpTransport">
+            <summary>
+            TCP transport
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.IErlTransport">
+            <summary>
+            General interface of TCP transports (i.e. usual TCP channel or SSH tunneled TCP channel)
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.IErlTransport.GetStream">
+            <summary>
+            Network stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.IErlTransport.Connect(System.String,System.Int32)">
+            <summary>
+            Connects to remote host:port
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.IErlTransport.Connect(System.String,System.Int32,System.Int32)">
+            <summary>
+            Connects to remote host:port with a timeout in milliseconds
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.IErlTransport.Close">
+            <summary>
+            Close connection
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.IErlTransport.SetSocketOption(System.Net.Sockets.SocketOptionLevel,System.Net.Sockets.SocketOptionName,System.Boolean)">
+            <summary>
+            Sets cocket options
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.IErlTransport.ReceiveBufferSize">
+            <summary>
+            Set receive buffer size
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.IErlTransport.SendBufferSize">
+            <summary>
+            Set send buffer size
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.IErlTransport.RemoteEndPoint">
+            <summary>
+            Remote endpoint
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.IErlTransport.NoDelay">
+            <summary>
+            NoDelay socket
+            </summary>
+        </member>
+        <member name="E:NFX.Erlang.IErlTransport.Trace">
+            <summary>
+            Trace event
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.IErlTransport.NodeName">
+            <summary>
+            Erlang node name
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.IErlTransport.ConnectTimeout">
+            <summary>
+            ConnectTimeout in milliseconds
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.IErlTransport.SSHServerPort">
+            <summary>
+            Port of SSH server
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.IErlTransport.SSHUserName">
+            <summary>
+            SSH user name
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.IErlTransport.SSHPrivateKeyFilePath">
+            <summary>
+            Private key file path (only for AuthenticationType = PublicKey)
+            Required SSH2 ENCRYPTED PRIVATE KEY format.
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.IErlTransport.SSHAuthenticationType">
+            <summary>
+            Type of auth on SSH server.
+            Valid values: "PublicKey", "Password".
+            </summary>
+        </member>
+        <member name="E:NFX.Erlang.ErlTcpTransport.Trace">
+            <summary>
+            Transmits trace messages
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlTransportFactory">
+            <summary>
+            Factory of IErlTransport
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlTransportPasswordSource">
+            <summary>
+            Source of passwrod for transport (i.e. for SSH connection)
+            </summary>
+            <remarks>
+            When IErlTransport requires password, it will call method GetPassword() of this class.
+            The app must to handle event PasswordRequired to return password.
+            </remarks>
+        </member>
+        <member name="M:NFX.Erlang.ErlTransportPasswordSource.GetPassword(System.Object,System.String,System.String)">
+            <summary>
+            Returns password for specified userName and nodeName
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTransportPasswordSource.StartPasswordSession(System.String,System.String)">
+            <summary>
+            Starts cache session of password
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTransportPasswordSource.FinishPasswordSession(NFX.Erlang.ErlPasswordSession)">
+            <summary>
+            Removes password session from cache
+            </summary>
+        </member>
+        <member name="E:NFX.Erlang.ErlTransportPasswordSource.PasswordRequired">
+            <summary>
+            Called when SSH(or other secure transport) user password (or private key file passphrase) is required.
+            Handler must to return password for specified userName and nodeName
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlPasswordRequiredEventHandler">
+            <summary>
+            Delegate is called when SSH tunnel requires password for authentication
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlPasswordSession">
+            <summary>
+            Keeps password for node and user
+            </summary>
+        </member>
+        <member name="T:NFX.DataAccess.Erlang.ErlCRUDMailbox">
+            <summary>
+            Implements mailboxes that receive data from Erlang CRUD data stores
+            </summary>
+        </member>
+        <member name="T:NFX.DataAccess.Erlang.ErlCRUDQueryExecutionContext">
+            <summary>
+            Provides query execution environment in Erlang context
+            </summary>
+        </member>
+        <member name="T:NFX.DataAccess.Erlang.ErlCRUDScriptQueryHandler">
+            <summary>
+            Executes Erlang CRUD script-based queries
+            </summary>
+        </member>
+        <member name="T:NFX.DataAccess.Erlang.ErlCRUDSubscription">
+            <summary>
+            Implements subscriptions to Erlang CRUD data stores
+            </summary>
+        </member>
+        <member name="T:NFX.DataAccess.Erlang.ErlDataAccessException">
+            <summary>
+            Thrown by Erlang data access classes
+            </summary>
+        </member>
+        <member name="T:NFX.DataAccess.Erlang.ErlServerSchemaChangedException">
+            <summary>
+            Thrown by Erlang data schema map when server has changed schema. The client needs to restart or
+             kill all cached data and refetch schema
+            </summary>
+        </member>
+        <member name="T:NFX.DataAccess.Erlang.ErlDataStore">
+            <summary>
+            Represents a CRUD data store that uses Erlang backend
+            </summary>
+        </member>
+        <member name="P:NFX.DataAccess.Erlang.ErlDataStore.LocalName">
+            <summary>
+            Shortcut to ErlApp.Node name
+            </summary>
+        </member>
+        <member name="P:NFX.DataAccess.Erlang.ErlDataStore.NextRequestID">
+            <summary>
+            Generates nest sequential request ID
+            </summary>
+        </member>
+        <member name="P:NFX.DataAccess.Erlang.ErlDataStore.Map">
+            <summary>
+            Returns the map lazily obtaining it when needed
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.DataAccess.ErlSchemaUtils.ToErlObject(NFX.DataAccess.CRUD.Row,System.String,System.String,System.Boolean)">
+            <summary>
+            Convert Row to a hierarchical term that corresponds to the row's schema.
+            The Erlang term is in the form:
+            <code>{SchemaName::atom(), [{FieldName::atom(), Value}]}.</code>
+            </summary>
+            <param name="row">Row to convert to Erlang object</param>
+            <param name="targetName">Target to use to lookup field attributes in the row</param>
+            <param name="schemaName">Alternative schema name to use for the outermost name of the schema in the output.</param>
+            <param name="outputDefVals">When false no field values are included in output if they are equal to default values</param>
+        </member>
+        <member name="M:NFX.Erlang.DataAccess.ErlSchemaUtils.Update(NFX.DataAccess.CRUD.Row,NFX.Erlang.IErlObject,NFX.DataAccess.CRUD.Schema,System.String,System.String,NFX.Registry{NFX.DataAccess.CRUD.Schema})">
+            <summary>
+            Convert an Erlang hierarchical term representing a schema to a Row.
+            </summary>
+            <param name="row">Row to update</param>
+            <param name="data">
+              Data to update row with.
+              The data must be in the form {SchemaName::atom, [{FieldName::atom(), Value}]}.
+            </param>
+            <param name="schema">Alternative schema to use in place of row.Schema</param>
+            <param name="targetName">Name of the target for looking up field attributes</param>
+            <param name="schemaName">Alternative name of the top-most 'SchemaName' atom used in the "data".</param>
+            <param name="knownSchemas">List of known schemas to use when initializing a field a DynamicRow type.</param>
+        </member>
+        <member name="M:NFX.Erlang.DataAccess.ErlSchemaUtils.checkKeyValueTuple(NFX.Erlang.IErlObject)">
+            <summary>
+            Check that value is in the form: {Name::atom(), Val}
+            </summary>
+        </member>
+        <member name="T:NFX.DataAccess.Erlang.SchemaMap">
+            <summary>
+            Maps Erlang schemas -> CRUD and CRUD -> Erlang
+            </summary>
+        </member>
+        <member name="M:NFX.DataAccess.Erlang.SchemaMap.GetErlSchemaSection(System.String)">
+            <summary>
+            Returns config section for named erl schema or null
+            </summary>
+        </member>
+        <member name="M:NFX.DataAccess.Erlang.SchemaMap.ErlCRUDResponseToRowset(System.String,NFX.Erlang.ErlList,System.Type)">
+             <summary>
+             Converts ErlCRUD response to CLR CRUD rowset
+             </summary>
+             <remarks>
+             An Example data packet is field defs as speced in schema:
+             "tca_jaba": has two field in PK
+             [
+                {tca_jaba, {1234, tav}, "User is cool", true},
+                {tca_jaba, {2344, zap}, "A bird wants to drink", false},
+                {tca_jaba, {8944, tav}, "Have you seen this?", false}
+             ]
+            
+             "aaa": has one field in PK - notice no tuple in key
+             [
+                {aaa, 1234, tav, "User is cool", true},
+                {aaa, 2344, zap, "A bird wants to drink", false},
+                {aaa, 8944, tav, "Have you seen this?", false}
+             ]
+             </remarks>
+        </member>
+        <member name="M:NFX.DataAccess.Erlang.SchemaMap.ErlTupleToRow(System.String,NFX.Erlang.ErlTuple,NFX.DataAccess.CRUD.Schema)">
+            <summary>
+            Maps ErlRow to CLR row supplied by schema, either Dynamic or TypedRow
+            </summary>
+        </member>
+        <member name="M:NFX.DataAccess.Erlang.SchemaMap.RowToErlTuple(NFX.DataAccess.CRUD.Row,System.Boolean)">
+            <summary>
+            Converts CLR row data into ErlTuple
+            </summary>
+        </member>
+        <member name="P:NFX.DataAccess.Erlang.SchemaMap.ErlSchemaSections">
+            <summary>
+            Enumerates all Erl schemas
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlApp.Node">
+            <summary>
+            Global node from config
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.NotEnoughDataException">
+            <summary>
+            Exception thrown when decoding an Erlang term if there's not enough
+            data in the buffer to construct the term
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlConnectionException">
+            <summary>
+            Exception thrown when the connection with a given node gets broken
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlConnectionException.Node">
+            <summary>
+            Name of the node that experienced connectivity loss
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlConnectionException.Reason">
+            <summary>
+            Get the reason associated with this exit signal
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlExit">
+            <summary>
+            Special message sent when a linked pid dies
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlExit.Pid">
+            <summary>
+            The pid that sent this exit
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlDown">
+            <summary>
+            Message sent when the monitored Pid dies
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlInputStream">
+            <summary>
+            Provides a stream for decoding Erlang terms from external format
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlInputStream.Read(System.Boolean)">
+            <summary>
+            Read arbitraty Erlang term from the stream, optionally checking protocol
+            version byte
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlInputStream.Read">
+            <summary>
+            Read arbitraty Erlang term from the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlInputStream.ReadByte">
+            <summary>
+            Read an Erlang byte from the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlInputStream.ReadBoolean">
+            <summary>
+            Read an Erlang atom from the stream and interpret the value as a boolean
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlInputStream.ReadAtom">
+            <summary>
+            Read an Erlang atom from the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlInputStream.ReadBinary">
+            <summary>
+            Read an Erlang binary from the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlInputStream.ReadDouble">
+            <summary>
+            Read an Erlang float from the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlInputStream.ReadList">
+            <summary>
+            Read Erlang list from the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlInputStream.ReadTuple">
+            <summary>
+            Read Erlang tuple from the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlInputStream.ReadPid">
+            <summary>
+            Read Erlang pid from the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlInputStream.ReadPort">
+            <summary>
+            Read Erlang port from the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlInputStream.ReadRef">
+            <summary>
+            Read Erlang reference from the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlInputStream.ReadString">
+            <summary>
+            Read Erlang string or list from the stream
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlInputStream.readListHead">
+            <summary>
+            Reads list head from the stream
+            </summary>
+            <returns>Arity of the list</returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlInputStream.readTupleHead">
+            <summary>
+            Read tuple header from stream
+            </summary>
+            <returns>Arity of the tuple</returns>
+        </member>
+        <member name="T:NFX.Erlang.ErlOutputStream">
+            <summary>
+            Provides a stream for encoding Erlang terms to external format for
+            transmission or storage
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlOutputStream.DEFAULT_INITIAL_SIZE">
+            <summary>
+            The default initial size of the stream
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlOutputStream.DEFAULT_INCREMENT">
+            <summary>
+            The default increment used when growing the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.#ctor(NFX.Erlang.IErlObject,System.Boolean,System.Boolean,System.Int32)">
+            <summary>
+            Create a stream containing the serialized Erlang term.
+            Optionally include in the beginning Erlang protocol version byte
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.ToBinaryString">
+            <summary>
+            Convert stream content to printable binary string (i.e. &lt;&lt;131,10,...>>)
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.Reset">
+            <summary>
+            Reset the stream so that it can be reused
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.GetBuffer">
+            <summary>
+            Get internal buffer
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.Write(NFX.Erlang.IErlObject)">
+            <summary>
+            Write an arbitrary Erlang term to the stream.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.Write(System.Byte)">
+            <summary>
+            Write one byte to the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteTo(System.IO.Stream)">
+            <summary>
+            Write the contents of the stream to an OutputStream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteAtom(NFX.Erlang.ErlAtom,System.Text.Encoding)">
+            <summary>
+            Write atom to the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteAtom(System.String,System.Text.Encoding)">
+            <summary>
+            Write string value as atom to the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteBinary(NFX.Erlang.ErlBinary)">
+            <summary>
+            Write an array of bytes to the stream as an Erlang binary
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteBoolean(NFX.Erlang.ErlBoolean)">
+            <summary>
+            Write a boolean value to the stream as the Erlang atom 'true' or 'false'
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteByte(NFX.Erlang.ErlByte)">
+            <summary>
+            Write a single byte to the stream as an Erlang integer
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteChar(System.Char)">
+            <summary>
+            Write a character to the stream as an Erlang integer
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteDouble(NFX.Erlang.ErlDouble)">
+            <summary>
+            Write a double value to the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteLong(NFX.Erlang.ErlLong)">
+            <summary>
+            Write an Erlang long to the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteLong(System.Int64)">
+            <summary>
+            Write a long to stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteInt(System.Int32)">
+            <summary>
+            Write an integer to the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteList(NFX.Erlang.ErlList)">
+            <summary>
+            Write Erlang list to stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteListHead(System.Int32,System.Boolean)">
+            <summary>
+            Write an Erlang list header to the stream. After calling this
+            method, you must write 'arity' elements to the stream followed by
+            nil, or it will not be possible to decode it later.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteNil">
+            <summary>
+            Write an empty Erlang list to the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteTuple(NFX.Erlang.ErlTuple)">
+            <summary>
+            Write Erlang tuple to stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteTupleHead(System.Int32)">
+            <summary>
+            Write an Erlang tuple header to the stream. After calling this
+            method, you must write 'arity' elements to the stream or it will
+            not be possible to decode it later.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteTrace(NFX.Erlang.ErlTrace)">
+            <summary>
+            Write Erlang tuple to stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WritePid(NFX.Erlang.ErlPid)">
+            <summary>
+            Write an Erlang PID to the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WritePort(NFX.Erlang.ErlPort)">
+            <summary>
+            Write an Erlang port to the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteRef(NFX.Erlang.ErlRef)">
+            <summary>
+            Write a new style (R6 and later) Erlang ref to the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteString(NFX.Erlang.ErlString,System.Text.Encoding)">
+            <summary>
+            Write a string to the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.WriteString(System.String,System.Text.Encoding)">
+            <summary>
+            Write a string to the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.Write1(System.Int64)">
+            <summary>
+            Write the low byte of a value to the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.Write2BE(System.Int64)">
+            <summary>
+            Write the low two bytes of a value to the stream in big endian order
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.Write4BE(System.Int64)">
+            <summary>
+            Write the low four bytes of a value to the stream in big endian order
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.Write(System.Byte[])">
+            <summary>
+            Write an array of bytes to the stream
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.InputStream(System.Int32)">
+             <summary>
+            
+             </summary>
+             <param name="offset"></param>
+             <returns></returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlOutputStream.Poke4BE(System.Int32,System.Int32)">
+             <summary>
+             Write the low four bytes of a value to the stream in bif endian
+             order, at the specified position. If the position specified is
+             beyond the end of the stream, this method will have no effect
+             </summary>
+             <remarks>
+             Normally this method should be used in conjunction with
+             <see cref="P:NFX.Erlang.ErlOutputStream.Position"/>, when is is necessary to insert data into
+             the stream before it is known what the actual value should be.
+             For example:
+            
+             <pre>
+             int pos = s.Position;
+             s.Write4BE(0); // make space for length data,
+             // but final value is not yet known
+            
+             [ ...more write statements...]
+            
+             // later... when we know the length value
+             s.Poke4BE(pos, length);
+             </pre>
+             </remarks>
+        </member>
+        <member name="P:NFX.Erlang.ErlOutputStream.Capacity">
+            <summary>
+            Get the current capacity of the stream. As bytes are added the
+            capacity of the stream is increased automatically, however this
+            method returns the current size
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlOutputStream.Position">
+            <summary>
+            Get the current position in the stream
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlOutputStream.Length">
+            <summary>
+            Get the number of bytes in the stream
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlPatternMatcher">
+            <summary>
+            Pattern matcher that implements a container of patterns to be
+            matched against a given Erlang term.  On successful match, the
+            corresponding func registered with that pattern gets invoked
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPatternMatcher.Add(System.String,NFX.Erlang.PatternMatchFunc)">
+            <summary>
+            Add a matching pattern to the collection
+            </summary>
+            <param name="pattern">Pattern to compile</param>
+            <param name="func">Function to invoke on successful match</param>
+            <returns>ID of the newly added pattern</returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlPatternMatcher.Add(NFX.Erlang.IErlObject,NFX.Erlang.PatternMatchFunc)">
+            <summary>
+            Add a matching pattern to the collection
+            </summary>
+            <param name="pattern">Erlang term to be used as a match pattern</param>
+            <param name="func">Function to invoke on successful match</param>
+            <returns>ID of the newly added pattern</returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlPatternMatcher.Add``1(``0,System.String,NFX.Erlang.PatternMatchFunc{``0})">
+            <summary>
+            Add a matching pattern to the collection
+            </summary>
+            <typeparam name="TContext">Type of context passed to func</typeparam>
+            <param name="context">Context passed to func</param>
+            <param name="pattern">Pattern to compile</param>
+            <param name="func">Function to invoke on successful match</param>
+            <returns>ID of the newly added pattern</returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlPatternMatcher.Add``1(``0,NFX.Erlang.IErlObject,NFX.Erlang.PatternMatchFunc{``0})">
+            <summary>
+            Add a matching pattern to the collection
+            </summary>
+            <typeparam name="TContext">Type of context passed to func</typeparam>
+            <param name="context">Context passed to func</param>
+            <param name="pattern">Compiled pattern containing variables to match</param>
+            <param name="func">Function to invoke on successful match</param>
+            <returns>ID of the newly added pattern</returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlPatternMatcher.Remove(System.Int32)">
+            <summary>
+            Remove pattern from collection given its ID
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPatternMatcher.Match(NFX.Erlang.IErlObject@,System.Object[])">
+            <summary>
+            Match a term against the patterns in the collection.
+            The first successful match will result in invocation of the func
+            associated with the pattern, and storing func result in the term
+            </summary>
+            <param name="term">Term to match against patterns</param>
+            <param name="args">Arguments to be passed to an func on successful pattern match</param>
+            <returns>ID of the pattern that matched, or -1 if there were no matches</returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlPatternMatcher.Clear">
+            <summary>
+            Clear the collection of patterns
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.AtomTable">
+             <summary>
+             Non-garbage collected hash table for atoms.
+            
+             It stores strings as atoms so that atoms can be quickly compared to
+             with O(1) complexity.  The instance of this table is statically maintained
+             and its content is never cleared.  The table contains a unique
+             list of strings represented as atoms added throughout the lifetime
+             of the application.
+             </summary>
+        </member>
+        <member name="M:NFX.Erlang.AtomTable.Exists(System.String)">
+            <summary>
+            Returns true if given atom is present in the atom table
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.AtomTable.IndexOf(System.String)">
+            <summary>
+            Returns index of atom in the atom table. If atom is not
+            found returns -1
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.AtomTable.defaultCapacity">
+            <summary>
+            Returns the default atom table maximum size. The value can be
+            changed by setting the EI_ATOM_TABLE_SIZE environment variable
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.AtomTable.Initialized">
+            <summary>
+            Returns true if AtomTable.Instance is initialized
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.AtomTable.Instance">
+            <summary>
+            Returns singleton instance of the atom table
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.AtomTable.Count">
+            <summary>
+            Returns the current number of atoms stored in the atom table
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.AtomTable.Item(System.Int32)">
+            <summary>
+            Lookup an atom in the atom table by index
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.AtomTable.Item(System.String)">
+            <summary>
+            Lookup an atom in the atom table by name. If the atom is not
+            present in the atom table - add it.  Return the index of the
+            atom in the atom table
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.Internal.ErlAcceptor">
+            <summary>
+            This thread simply listens for incoming connections
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.Internal.ErlBlockingQueue`1.Handle">
+            <summary>
+            Queue message arrival notification handle
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlConsts">
+            <summary>
+            Provides non-localizable Erlang constants
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlConsts.ERL_INT_MAX">
+            <summary>
+            The largest value that can be encoded as an integer
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlConsts.ERL_INT_MIN">
+            <summary>
+            The smallest value that can be encoded as an integer
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.Internal.ErlIoServer">
+            <summary>
+            I/O server processing distributed I/O operations from remote
+            Erlang nodes
+            </summary>
+            <remarks>
+            <see href="http://erlang.org/doc/apps/stdlib/io_protocol.html"/>
+            </remarks>
+        </member>
+        <member name="T:NFX.Erlang.Internal.Parser">
+            <summary>
+            Provides compilation of strings to Erlang terms
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.Internal.Parser.Format(NFX.Erlang.ErlList)">
+            <summary>
+            Substitute variables in a string contained in args[0]. The
+            substitution values begin with args[1]
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.Internal.Parser.Format(System.String,NFX.Erlang.ErlList)">
+            <summary>
+            Substitute variables in a fmt string
+            </summary>
+            <param name="fmt">Format string containing substitution variables (e.g. '~w')</param>
+            <param name="args">List of arguments</param>
+        </member>
+        <member name="M:NFX.Erlang.Internal.Parser.Format(System.String,System.Object[])">
+            <summary>
+            Substitute variables in a fmt string. The following variables are supported:
+            <dl>
+            <dt>~v</dt><dd>Take next argument as string.
+                            If the argument is ErlAtom, it's name is used. If the argument is
+                            ErlVar it's name is used with the type if the fmt string doesn't have
+                            the variable type specification (e.g. A::integer()), or the name
+                            is used verbatim, if the variable type is present in the format
+                            string.  Finally if the argument is not ErlAtom and ErlVar, it's
+                            inserted as string verbatim</dd>
+            <dt>~w</dt><dd>Format next argument as string</dd>
+            <dt>~i</dt><dd>Skip next argument</dd>
+            <dt>~c</dt><dd>Format next argument as the character</dd>
+            </dl>
+            </summary>
+            <param name="fmt">Format string containing substitution variables (e.g. '~w')</param>
+            <param name="args">List of arguments</param>
+        </member>
+        <member name="M:NFX.Erlang.Internal.Parser.ParseMFA(System.String,System.Int32@,System.Int32@,System.Object[])">
+            <summary>
+            Parses a string representation of an Erlang function call in the form
+            <code>Module:Function(Arg1, ..., Arg)</code> or
+            <code>Module:Function(Arg1, ..., Arg).</code>
+            </summary>
+            <param name="fmt">string to parse</param>
+            <param name="pos">starting index</param>
+            <param name="argc">argument number</param>
+            <param name="args">optional arguments</param>
+            <returns>A 3-element tuple containing Module, Function, Arguments</returns>
+        </member>
+        <member name="M:NFX.Erlang.Internal.Parser.Parse(System.String,System.Int32@,System.Int32@,System.Object[])">
+            <summary>
+            Compile a string fmt into an Erlang term
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.Internal.ErlRpcServer">
+            <summary>
+            Server that handles inbound RPC calls
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.Internal.MboxRegistry">
+            <summary>
+            This class implements a registry of Mailboxes indexed by Name and Pid
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.Internal.MboxRegistry.Create(NFX.Erlang.ErlAtom)">
+            <summary>
+            Create a named mailbox if one is not already registered, otherwise
+            return registered mailbox
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.Internal.MboxRegistry.Create(System.Boolean)">
+            <summary>
+            Return a new or unused mailbox from freelist
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.Internal.MboxRegistry.Register(NFX.Erlang.ErlMbox)">
+            <summary>
+            Register an unnamed mailbox with the registry
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.Internal.MboxRegistry.Register(System.String,NFX.Erlang.ErlMbox)">
+            <summary>
+            Register a named mailbox with the registry. Name must not be empty
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.Internal.MboxRegistry.Register(NFX.Erlang.ErlAtom,NFX.Erlang.ErlMbox)">
+            <summary>
+            Register a named mailbox with the registry. Name must not be empty
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.Internal.MboxRegistry.Unregister(NFX.Erlang.ErlMbox)">
+            <summary>
+            Unregister a mailbox and move it to free-list
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.Internal.MboxRegistry.Clear">
+            <summary>
+            Clear the registry
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.Internal.MboxRegistry.RegNames">
+            <summary>
+            Return a list of all registered mailboxes
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.Internal.MboxRegistry.Item(NFX.Erlang.ErlAtom)">
+            <summary>
+            Look up a mailbox based on its name
+            </summary>
+            <returns>Mailbox or null if the name is not registered</returns>
+        </member>
+        <member name="P:NFX.Erlang.Internal.MboxRegistry.Item(NFX.Erlang.ErlPid)">
+            <summary>
+            Look up a mailbox based on its pid
+            </summary>
+            <returns>Mailbox reference or null if the pid is not present on this node</returns>
+        </member>
+        <member name="T:NFX.Erlang.StringConsts">
+            <summary>
+            A dictionary of framework text messages.
+            Localization may be done in this class in future
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlTypeOrder">
+            <summary>
+            Defines ordering semantics for Erlang types
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlExternalTag">
+            <summary>
+            Tags used for external format serialization
+            </summary>
+            <remarks>
+            https://github.com/erlang/otp/blob/master/lib/erl_interface/include/ei.h
+            </remarks>
+        </member>
+        <member name="T:NFX.Erlang.IErlObject">
+            <summary>
+            All Erlang terms implement this interface
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.IErlObject.Clone">
+            <summary>
+            Clone an instance of Erlang object by performing deep copy of non-scalar terms
+            and shallow copy of scalar terms
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.IErlObject.Match(NFX.Erlang.IErlObject,NFX.Erlang.ErlVarBind)">
+            <summary>
+            Perform pattern match on this Erlang term, storing matched variables
+            found in the pattern into the binding.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.IErlObject.Match(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term returning null if match fails
+            or a dictionary of matched variables bound in the pattern
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.IErlObject.Matches(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term without binding any variables
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.IErlObject.Subst(NFX.Erlang.IErlObject@,NFX.Erlang.ErlVarBind)">
+            <summary>
+            Substitute variables in a given Erlang term provided a dictionary
+            of bound values
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.IErlObject.Visit``1(``0,System.Func{``0,NFX.Erlang.IErlObject,``0})">
+            <summary>
+            Execute fun for every nested term
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.IErlObject.TypeOrder">
+            <summary>
+            Defines order of the Erlang term for comparison purposes
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.IErlObject.IsScalar">
+            <summary>
+            Determines whether the underlying type is scalar or complex (i.e. tuple, list)
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAtom.#ctor(System.String)">
+            <summary>
+            Create an atom from the given string
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlAtom.Index">
+            <summary>
+            The index of this atom in the global atom table
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAtom.op_Implicit(NFX.Erlang.ErlAtom)~System.String">
+            <summary>
+            Implicit conversion of atom to string
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAtom.op_Implicit(System.String)~NFX.Erlang.ErlAtom">
+            <summary>
+            Implicit conversion of string to atom
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAtom.ToString">
+            <summary>
+            Get the printname of the atom represented by this object. The
+            difference between this method and {link #atomValue atomValue()}
+            is that the printname is quoted and escaped where necessary,
+            according to the Erlang rules for atom naming
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAtom.Equals(System.Object)">
+            <summary>
+            Determine if this atom equals to the object
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAtom.Equals(NFX.Erlang.IErlObject)">
+            <summary>
+            Determine if two atoms are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAtom.GetHashCode">
+            <summary>
+            Get internal hash code
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAtom.CompareTo(System.Object)">
+            <summary>
+            Compare this instance to the object.
+            Negative value means that the atom is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAtom.CompareTo(NFX.Erlang.IErlObject)">
+            <summary>
+            Compare this instance to the IErlObject.
+            Negative value means that the atom is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAtom.Clone">
+            <summary>
+            Clone an instance of the object (non-scalar immutable objects are copied by reference)
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAtom.Match(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term returning null if match fails
+            or a dictionary of matched variables bound in the pattern
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAtom.Match(NFX.Erlang.IErlObject,NFX.Erlang.ErlVarBind)">
+            <summary>
+            Perform pattern match on this Erlang term, storing matched variables
+            found in the pattern into the binding.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAtom.Matches(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term without binding any variables
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlAtom.Visit``1(``0,System.Func{``0,NFX.Erlang.IErlObject,``0})">
+            <summary>
+            Execute fun for every nested term
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlAtom.Empty">
+            <summary>
+            Returns true if this instance equals ErlAtom.Null
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlAtom.Value">
+            <summary>
+            Get the actual string contained in this object
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlAtom.IsScalar">
+            <summary>
+            Determines whether the underlying type is scalar or complex (i.e. tuple, list)
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlAtom.Length">
+            <summary>
+            Return the length of the atom string
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlBinary">
+            <summary>
+            Provides a C# representation of Erlang integer types
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBinary.#ctor(System.Byte[],System.Boolean)">
+            <summary>
+            Create an Erlang binary from the given value
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBinary.#ctor(System.Byte[],System.Int32,System.Int32)">
+            <summary>
+            Create an Erlang binary by copying its value from the given buffer
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBinary.op_Implicit(NFX.Erlang.ErlBinary)~System.Byte[]">
+            <summary>
+            Implicit conversion of ErlBinary to byte[]
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBinary.ToBinaryString(System.Int32)">
+            <summary>
+            Returns binary representation of the string encoded as &lt;&lt;...&gt;&gt;
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlBinary.ToPrintableString(System.Int32)">
+            <summary>
+            Returns printable binary representation of the string encoded as &lt;&lt;"abc..."&gt;&gt;
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlBinary.ToBinaryString(System.Byte[],System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Convert a byte buffer to printable binary representation (i.e. &lt;&lt;131,15,12,...>>)
+            </summary>
+            <param name="buf">Buffer to convert</param>
+            <param name="offset">Offset in the buffer</param>
+            <param name="count">Number of bytes to convert</param>
+            <param name="maxLen">Maximum allowed length of returned string. If given, and
+            resulting string exceeds this value, it'll be trimmed to this length ending
+            with "...>>"</param>
+            <returns></returns>
+        </member>
+        <member name="M:NFX.Erlang.ErlBinary.ToPrintableString(System.Byte[],System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Convert a byte buffer to printable binary representation (i.e. &lt;&lt;"abc...">>)
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBinary.Equals(System.Object)">
+            <summary>
+            Determine if this instance equals to the object
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBinary.Equals(NFX.Erlang.IErlObject)">
+            <summary>
+            Determine if two instances are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBinary.Equals(NFX.Erlang.ErlBinary)">
+            <summary>
+            Determine if two instances are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBinary.GetHashCode">
+            <summary>
+            Get internal hash code
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBinary.CompareTo(System.Object)">
+            <summary>
+            Compare this instance to the object.
+            Negative value means that the value is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBinary.CompareTo(NFX.Erlang.IErlObject)">
+            <summary>
+            Compare this instance to the IErlObject.
+            Negative value means that the value is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBinary.Clone">
+            <summary>
+            Clone an instance of the object (non-scalar immutable objects are copied by reference)
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBinary.Visit``1(``0,System.Func{``0,NFX.Erlang.IErlObject,``0})">
+            <summary>
+            Execute fun for every nested term
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBinary.Match(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term returning null if match fails
+            or a dictionary of matched variables bound in the pattern
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBinary.Match(NFX.Erlang.IErlObject,NFX.Erlang.ErlVarBind)">
+            <summary>
+            Perform pattern match on this Erlang term, storing matched variables
+            found in the pattern into the binding.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBinary.Matches(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term without binding any variables
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlBinary.Length">
+            <summary>
+            Return length of the binary byte array
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlBoolean">
+            <summary>
+            Provides a C# representation of Erlang floats and doubles. Erlang
+            defines only one floating point numeric type
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBoolean.#ctor(System.Boolean)">
+            <summary>
+            Create an Erlang boolean from the given boolean value.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBoolean.op_Implicit(NFX.Erlang.ErlBoolean)~System.Boolean">
+            <summary>
+            Implicit conversion of ErlBoolean to bool
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBoolean.op_Implicit(System.Boolean)~NFX.Erlang.ErlBoolean">
+            <summary>
+            Implicit conversion of bool to ErlBoolean
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBoolean.Equals(System.Object)">
+            <summary>
+            Determine if this atom equals to the object
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBoolean.Equals(NFX.Erlang.IErlObject)">
+            <summary>
+            Determine if two atoms are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBoolean.Equals(NFX.Erlang.ErlBoolean)">
+            <summary>
+            Determine if two atoms are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBoolean.GetHashCode">
+            <summary>
+            Get internal hash code
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBoolean.CompareTo(System.Object)">
+            <summary>
+            Compare this instance to the object.
+            Negative value means that the atom is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBoolean.CompareTo(NFX.Erlang.IErlObject)">
+            <summary>
+            Compare this instance to the IErlObject.
+            Negative value means that the atom is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBoolean.Clone">
+            <summary>
+            Clone an instance of the object (non-scalar immutable objects are copied by reference)
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBoolean.Visit``1(``0,System.Func{``0,NFX.Erlang.IErlObject,``0})">
+            <summary>
+            Execute fun for every nested term
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBoolean.Match(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term returning null if match fails
+            or a dictionary of matched variables bound in the pattern
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBoolean.Match(NFX.Erlang.IErlObject,NFX.Erlang.ErlVarBind)">
+            <summary>
+            Perform pattern match on this Erlang term, storing matched variables
+            found in the pattern into the binding.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlBoolean.Matches(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term without binding any variables
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlByte">
+            <summary>
+            Provides a C# representation of Erlang integer types
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlByte.#ctor(System.Byte)">
+            <summary>
+            Create an Erlang integer from the given value
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlByte.op_Implicit(NFX.Erlang.ErlByte)~System.Byte">
+            <summary>
+            Implicit conversion of ErlByte to byte
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlByte.op_Explicit(System.Int32)~NFX.Erlang.ErlByte">
+            <summary>
+            Implicit conversion of byte/char to ErlByte
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlByte.Equals(System.Object)">
+            <summary>
+            Determine if this atom equals to the object
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlByte.Equals(NFX.Erlang.IErlObject)">
+            <summary>
+            Determine if two values are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlByte.Equals(NFX.Erlang.ErlByte)">
+            <summary>
+            Determine if two instances are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlByte.GetHashCode">
+            <summary>
+            Get internal hash code
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlByte.CompareTo(System.Object)">
+            <summary>
+            Compare this instance to the object.
+            Negative value means that the value is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlByte.CompareTo(NFX.Erlang.IErlObject)">
+            <summary>
+            Compare this instance to the IErlObject.
+            Negative value means that the value is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlByte.Clone">
+            <summary>
+            Clone an instance of the object (non-scalar immutable objects are copied by reference)
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlByte.Visit``1(``0,System.Func{``0,NFX.Erlang.IErlObject,``0})">
+            <summary>
+            Execute fun for every nested term
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlByte.Match(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term returning null if match fails
+            or a dictionary of matched variables bound in the pattern
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlByte.Match(NFX.Erlang.IErlObject,NFX.Erlang.ErlVarBind)">
+            <summary>
+            Perform pattern match on this Erlang term, storing matched variables
+            found in the pattern into the binding.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlByte.Matches(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term without binding any variables
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlDouble">
+            <summary>
+            Provides a C# representation of Erlang floats and doubles. Erlang
+            defines only one floating point numeric type
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlDouble.#ctor(System.Double)">
+            <summary>
+            Create an Erlang float from the given double value.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlDouble.op_Implicit(NFX.Erlang.ErlDouble)~System.Double">
+            <summary>
+            Implicit conversion of ErlLong to double
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlDouble.Equals(System.Object)">
+            <summary>
+            Determine if this instance equals to the object
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlDouble.Equals(NFX.Erlang.IErlObject)">
+            <summary>
+            Determine if two instances are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlDouble.Equals(NFX.Erlang.ErlDouble,System.Double)">
+            <summary>
+            Determine if two instances are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlDouble.GetHashCode">
+            <summary>
+            Get internal hash code
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlDouble.CompareTo(System.Object)">
+            <summary>
+            Compare this instance to the object.
+            Negative value means that the value is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlDouble.CompareTo(NFX.Erlang.IErlObject)">
+            <summary>
+            Compare this instance to the IErlObject.
+            Negative value means that the value is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlDouble.Clone">
+            <summary>
+            Clone an instance of the object (non-scalar immutable objects are copied by reference)
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlDouble.Visit``1(``0,System.Func{``0,NFX.Erlang.IErlObject,``0})">
+            <summary>
+            Execute fun for every nested term
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlDouble.Match(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term returning null if match fails
+            or a dictionary of matched variables bound in the pattern
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlDouble.Match(NFX.Erlang.IErlObject,NFX.Erlang.ErlVarBind)">
+            <summary>
+            Perform pattern match on this Erlang term, storing matched variables
+            found in the pattern into the binding.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlDouble.Matches(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term without binding any variables
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTupleBase.#ctor(NFX.Erlang.IErlObject[],System.Boolean)">
+            <summary>
+            Create an Erlang string from the given string
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlTupleBase.m_Items">
+            <summary>
+            The index of this atom in the global atom table
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTupleBase.Cast``1(System.Int32)">
+            <summary>
+            Return index'th element cast to the given type
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTupleBase.Add(NFX.Erlang.IErlObject)">
+            <summary>
+            Add an item to a mutable list. This method must be used only during
+            list construction phase, since it treats the list as a mutable entity
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTupleBase.ToString">
+            <summary>
+            Get the string representation of the list.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTupleBase.Equals(System.Object)">
+            <summary>
+            Determine if this instance is equal to the object
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTupleBase.Equals(NFX.Erlang.IErlObject)">
+            <summary>
+            Determine if two Erlang objects are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTupleBase.GetHashCode">
+            <summary>
+            Get internal hash code
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTupleBase.CompareTo(System.Object)">
+            <summary>
+            Compare this instance to the object.
+            Negative value means that the atom is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTupleBase.CompareTo(NFX.Erlang.IErlObject)">
+            <summary>
+            Compare this instance to the IErlObject.
+            Negative value means that the atom is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTupleBase.Match(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term returning null if match fails
+            or a dictionary of matched variables bound in the pattern
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTupleBase.Match(NFX.Erlang.IErlObject,NFX.Erlang.ErlVarBind)">
+            <summary>
+            Perform pattern match on this Erlang term, storing matched variables
+            found in the pattern into the binding.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTupleBase.Matches(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term without binding any variables
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTupleBase.Visit``1(``0,System.Func{``0,NFX.Erlang.IErlObject,``0})">
+            <summary>
+            Execute fun for every nested term
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTupleBase.Clone">
+            <summary>
+            Clone an instance of the object (non-scalar immutable objects are copied by reference)
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlTupleBase.Value">
+            <summary>
+            Get the list of Erlang terms contained in this object
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlTupleBase.IsScalar">
+            <summary>
+            Determines whether the underlying type is scalar or complex (i.e. tuple, list)
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlTupleBase.Item(System.Int32)">
+            <summary>
+            Return index'th element from the container
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlTupleBase.Count">
+            <summary>
+            Return number of elements in the container
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlList.#ctor(NFX.Erlang.IErlObject[],System.Boolean)">
+            <summary>
+            Create an Erlang string from the given string
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlList.op_Implicit(NFX.Erlang.ErlList)~System.Collections.Generic.List{NFX.Erlang.IErlObject}">
+            <summary>
+            Implicit conversion of atom to string
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlList.Equals(NFX.Erlang.IErlObject)">
+            <summary>
+            Determine if two Erlang objects are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlList.Equals(NFX.Erlang.ErlList)">
+            <summary>
+            Determine if two Erlang lists are equal
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlLong">
+            <summary>
+            Provides a C# representation of Erlang integer types
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLong.#ctor(System.Int64)">
+            <summary>
+            Create an Erlang integer from the given value
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLong.op_Explicit(NFX.Erlang.ErlLong)~System.Int32">
+            <summary>
+            Implicit conversion of ErlLong to int
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLong.Equals(System.Object)">
+            <summary>
+            Determine if this instance equals to the object
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLong.Equals(NFX.Erlang.IErlObject)">
+            <summary>
+            Determine if two instances are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLong.Equals(NFX.Erlang.ErlLong)">
+            <summary>
+            Determine if two instances are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLong.GetHashCode">
+            <summary>
+            Get internal hash code
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLong.CompareTo(System.Object)">
+            <summary>
+            Compare this instance to the object.
+            Negative value means that the value is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLong.CompareTo(NFX.Erlang.IErlObject)">
+            <summary>
+            Compare this instance to the IErlObject.
+            Negative value means that the value is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLong.Clone">
+            <summary>
+            Clone an instance of the object (non-scalar immutable objects are copied by reference)
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLong.Visit``1(``0,System.Func{``0,NFX.Erlang.IErlObject,``0})">
+            <summary>
+            Execute fun for every nested term
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLong.Match(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term returning null if match fails
+            or a dictionary of matched variables bound in the pattern
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLong.Match(NFX.Erlang.IErlObject,NFX.Erlang.ErlVarBind)">
+            <summary>
+            Perform pattern match on this Erlang term, storing matched variables
+            found in the pattern into the binding.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlLong.Matches(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term without binding any variables
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlObject">
+            <summary>
+            Class defines extension methods on types implementing IErlObject interface
+            and static methods dealing with IErlObject
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlObject.IsNull(NFX.Erlang.IErlObject)">
+            <summary>
+            Determines if Erlang object is NULL - that is ErlAtom.Undefined or null reference
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlObject.IsInt(NFX.Erlang.IErlObject)">
+            <summary>
+            Determines if Erlang object is of type ErlByte or ErlLong
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlObject.Subst(NFX.Erlang.IErlObject,NFX.Erlang.ErlVarBind)">
+            <summary>
+            Substibute all variables in the given object using provided binding
+            and return the resulting object
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlObject.Visit``1(NFX.Erlang.IErlObject,``0,System.Func{``0,NFX.Erlang.IErlObject,``0})">
+            <summary>
+            Execute fun for every nested term
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlObject.ToErlString(System.String)">
+            <summary>
+            Convert C# string to ErlString
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlObject.ErlArgs(System.String,System.Object[])">
+            <summary>
+            Convert C# string to ErlString
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlObject.Format(NFX.Erlang.ErlList)">
+            <summary>
+            Substitute variables in the args[0] string
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlObject.Parse(System.String,System.Object[])">
+            <summary>
+            Parse a string into an Erlang term
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlObject.Parse``1(System.String,System.Object[])">
+            <summary>
+            Parse a string into an Erlang term
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlObject.ParseMFA(System.String,System.Object[])">
+            <summary>
+            Parse a string representation of an Erlang function call
+            "Module:Function(Arg1, ..., ArgN)" to a 3-element (Module, Function, Arguments) tuple
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlObject.ToErlObject(System.String,System.Object[])">
+            <summary>
+            String extension method to parse a string into an Erlang term
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlObject.To``1(System.String,System.Object[])">
+            <summary>
+            Parse a string into an Erlang term
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlObject.ToErlMFA(System.String,System.Object[])">
+            <summary>
+            Parse a string representation of an Erlang function call
+            "Module:Function(Arg1, ..., ArgN)" to a 3-element (Module, Function, Arguments) tuple
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlObject.AsType(NFX.Erlang.IErlObject,System.Type)">
+            <summary>
+            Tries to convert an Erlang term as specified native type.
+            Throw exception if conversion is not possible
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlObject.ToErlObject(System.Object)">
+            <summary>
+            Try to convert .NET native object type to corresponding Erlang term.
+            Throw exception if conversion is not possible
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlObject.ToErlObject(System.Object,NFX.Erlang.ErlTypeOrder,System.Boolean)">
+            <summary>
+            Try to convert .NET native object type to corresponding Erlang term of given type.
+            Throw exception if conversion is not possible
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlPid">
+            <summary>
+            Provides a C# representation of Erlang integer types
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlPid.Null">
+            <summary>
+            Special value non-existing Pid used for "null" pid comparison
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPid.#ctor(System.String,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Create an Erlang pid from the given values
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPid.#ctor(NFX.Erlang.ErlAtom,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Create an Erlang pid from the given values
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPid.#ctor(NFX.Erlang.ErlAtom,System.Int32,System.Int32)">
+            <summary>
+            Create an Erlang pid from a monotonically increasing integer in range [1 ... ]
+            </summary>
+            <param name="node"></param>
+            <param name="id"></param>
+            <param name="creation"></param>
+        </member>
+        <member name="M:NFX.Erlang.ErlPid.Equals(System.Object)">
+            <summary>
+            Determine if this instance equals to the object
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPid.Equals(NFX.Erlang.IErlObject)">
+            <summary>
+            Determine if two instances are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPid.Equals(NFX.Erlang.ErlPid)">
+            <summary>
+            Determine if two instances are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPid.GetHashCode">
+            <summary>
+            Get internal hash code
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPid.CompareTo(System.Object)">
+            <summary>
+            Compare this instance to the object.
+            Negative value means that the value is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPid.CompareTo(NFX.Erlang.IErlObject)">
+            <summary>
+            Compare this instance to the IErlObject.
+            Negative value means that the value is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPid.Clone">
+            <summary>
+            Clone an instance of the object (non-scalar immutable objects are copied by reference)
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPid.Visit``1(``0,System.Func{``0,NFX.Erlang.IErlObject,``0})">
+            <summary>
+            Execute fun for every nested term
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPid.Match(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term returning null if match fails
+            or a dictionary of matched variables bound in the pattern
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPid.Match(NFX.Erlang.IErlObject,NFX.Erlang.ErlVarBind)">
+            <summary>
+            Perform pattern match on this Erlang term, storing matched variables
+            found in the pattern into the binding.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPid.Matches(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term without binding any variables
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlPort">
+            <summary>
+            Provides a C# representation of Erlang integer types
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlPort.Null">
+            <summary>
+            Special value non-existing Port used for "null" pid comparison
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPort.#ctor(System.String,System.Int32,System.Int32)">
+            <summary>
+            Create an Erlang port from the given values
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPort.#ctor(NFX.Erlang.ErlAtom,System.Int32,System.Int32)">
+            <summary>
+            Create an Erlang port from the given values
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPort.Equals(System.Object)">
+            <summary>
+            Determine if this instance equals to the object
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPort.Equals(NFX.Erlang.IErlObject)">
+            <summary>
+            Determine if two instances are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPort.Equals(NFX.Erlang.ErlPort)">
+            <summary>
+            Determine if two instances are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPort.GetHashCode">
+            <summary>
+            Get internal hash code
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPort.CompareTo(System.Object)">
+            <summary>
+            Compare this instance to the object.
+            Negative value means that the value is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPort.CompareTo(NFX.Erlang.IErlObject)">
+            <summary>
+            Compare this instance to the IErlObject.
+            Negative value means that the value is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPort.Clone">
+            <summary>
+            Clone an instance of the object (non-scalar immutable objects are copied by reference)
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPort.Visit``1(``0,System.Func{``0,NFX.Erlang.IErlObject,``0})">
+            <summary>
+            Execute fun for every nested term
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPort.Match(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term returning null if match fails
+            or a dictionary of matched variables bound in the pattern
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPort.Match(NFX.Erlang.IErlObject,NFX.Erlang.ErlVarBind)">
+            <summary>
+            Perform pattern match on this Erlang term, storing matched variables
+            found in the pattern into the binding.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlPort.Matches(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term without binding any variables
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlRef">
+            <summary>
+            Provides a C# representation of Erlang integer types
+            </summary>
+        </member>
+        <member name="F:NFX.Erlang.ErlRef.Null">
+            <summary>
+            Special value non-existing Pid used for "null" ref comparison
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlRef.#ctor(System.String,System.Int32[],System.Int32)">
+            <summary>
+            Create an Erlang reference from the given values
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlRef.#ctor(NFX.Erlang.ErlAtom,System.Int32[],System.Int32)">
+            <summary>
+            Create an Erlang reference from the given values
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlRef.#ctor(NFX.Erlang.ErlAtom,System.UInt32[],System.Int32)">
+            <summary>
+            Create an Erlang reference from the given values
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlRef.Equals(System.Object)">
+            <summary>
+            Determine if this instance equals to the object
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlRef.Equals(NFX.Erlang.IErlObject)">
+            <summary>
+            Determine if two instances are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlRef.Equals(NFX.Erlang.ErlRef)">
+            <summary>
+            Determine if two instances are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlRef.GetHashCode">
+            <summary>
+            Get internal hash code
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlRef.CompareTo(System.Object)">
+            <summary>
+            Compare this instance to the object.
+            Negative value means that the value is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlRef.CompareTo(NFX.Erlang.IErlObject)">
+            <summary>
+            Compare this instance to the IErlObject.
+            Negative value means that the value is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlRef.Clone">
+            <summary>
+            Clone an instance of the object (non-scalar immutable objects are copied by reference)
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlRef.Visit``1(``0,System.Func{``0,NFX.Erlang.IErlObject,``0})">
+            <summary>
+            Execute fun for every nested term
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlRef.Match(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term returning null if match fails
+            or a dictionary of matched variables bound in the pattern
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlRef.Match(NFX.Erlang.IErlObject,NFX.Erlang.ErlVarBind)">
+            <summary>
+            Perform pattern match on this Erlang term, storing matched variables
+            found in the pattern into the binding.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlRef.Matches(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term without binding any variables
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlString.#ctor(System.String)">
+            <summary>
+            Create an Erlang string from the given string
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlString.op_Implicit(NFX.Erlang.ErlString)~System.String">
+            <summary>
+            Implicit conversion of ErlString to string
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlString.op_Implicit(System.String)~NFX.Erlang.ErlString">
+            <summary>
+            Implicit conversion of string to ErlString
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlString.ToString">
+            <summary>
+            Get the printname of the atom represented by this object. The
+            difference between this method and {link #atomValue atomValue()}
+            is that the printname is quoted and escaped where necessary,
+            according to the Erlang rules for atom naming
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlString.Equals(System.Object)">
+            <summary>
+            Determine if this atom equals to the object
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlString.Equals(NFX.Erlang.IErlObject)">
+            <summary>
+            Determine if two Erlang objects are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlString.Equals(NFX.Erlang.ErlString)">
+            <summary>
+            Determine if two Erlang objects are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlString.GetHashCode">
+            <summary>
+            Get internal hash code
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlString.CompareTo(System.Object)">
+            <summary>
+            Compare this instance to the object.
+            Negative value means that the atom is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlString.CompareTo(NFX.Erlang.IErlObject)">
+            <summary>
+            Compare this instance to the IErlObject.
+            Negative value means that the atom is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlString.Clone">
+            <summary>
+            Clone an instance of the object (non-scalar immutable objects are copied by reference)
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlString.Visit``1(``0,System.Func{``0,NFX.Erlang.IErlObject,``0})">
+            <summary>
+            Execute fun for every nested term
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlString.Match(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term returning null if match fails
+            or a dictionary of matched variables bound in the pattern
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlString.Match(NFX.Erlang.IErlObject,NFX.Erlang.ErlVarBind)">
+            <summary>
+            Perform pattern match on this Erlang term, storing matched variables
+            found in the pattern into the binding.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlString.Matches(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term without binding any variables
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlString.Value">
+            <summary>
+            Get the actual string contained in this object
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlString.Empty">
+            <summary>
+            Returns true if Value is a non-empty string
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlString.Length">
+            <summary>
+            Length of the string
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlString.IsScalar">
+            <summary>
+            Determines whether the underlying type is scalar or complex (i.e. tuple, list)
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlTrace">
+            <summary>
+            Special class used for passing tracing information in Erlang distributed
+            messages SEND_TT, EXIT_TT, REG_SEND_TT, EXIT2_TT
+            </summary>
+            <remarks>
+            See
+            </remarks>
+        </member>
+        <member name="M:NFX.Erlang.ErlTuple.#ctor(NFX.Erlang.IErlObject[])">
+            <summary>
+            Create an Erlang tuple from the given list of items
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTuple.op_Implicit(NFX.Erlang.ErlTuple)~System.Collections.Generic.List{NFX.Erlang.IErlObject}">
+            <summary>
+            Implicit conversion of atom to string
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTuple.Equals(NFX.Erlang.IErlObject)">
+            <summary>
+            Determine if two Erlang objects are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTuple.Equals(NFX.Erlang.ErlTuple)">
+            <summary>
+            Determine if two Erlang tuples are equal
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlTuple.ValueAsDateTime">
+            <summary>
+            Returns tuple value as DateTime in UTC if the tuple is in the form
+            <code>{MegaSec, Sec, MicroSec}</code>
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTrace.#ctor(System.Int32,System.Int32,System.Int32,NFX.Erlang.ErlPid,System.Int32)">
+            <summary>
+            Create an Erlang trace from the given arguments
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTrace.op_Implicit(NFX.Erlang.ErlTrace)~System.Collections.Generic.List{NFX.Erlang.IErlObject}">
+            <summary>
+            Implicit conversion of atom to string
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTrace.Equals(NFX.Erlang.IErlObject)">
+            <summary>
+            Determine if two Erlang objects are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlTrace.Equals(NFX.Erlang.ErlTrace)">
+            <summary>
+            Determine if two Erlang tuples are equal
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlVar">
+            <summary>
+            Provides a C# representation of an Erlang variable
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlVar.#ctor(System.String)">
+            <summary>
+            Create an Erlang named variable
+            </summary>
+            <param name="name">Variable name</param>
+        </member>
+        <member name="M:NFX.Erlang.ErlVar.#ctor(System.String,NFX.Erlang.ErlTypeOrder)">
+            <summary>
+            Create an Erlang typed named variable
+            </summary>
+            <param name="name">Variable name</param>
+            <param name="type">Value type</param>
+        </member>
+        <member name="M:NFX.Erlang.ErlVar.#ctor(NFX.Erlang.ErlAtom,NFX.Erlang.ErlTypeOrder)">
+            <summary>
+            Create an Erlang typed named variable using ErlAtom as name
+            </summary>
+            <param name="name">Variable name</param>
+            <param name="type">Value type</param>
+        </member>
+        <member name="F:NFX.Erlang.ErlVar.ValueType">
+            <summary>
+            Type of value stored in this variable
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlVar.ToString">
+            <summary>
+            Get the printable version of the string contained in this object
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlVar.Visit``1(``0,System.Func{``0,NFX.Erlang.IErlObject,``0})">
+            <summary>
+            Execute fun for every nested term
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlVar.Match(NFX.Erlang.IErlObject)">
+            <summary>
+            Perform pattern match on this Erlang term returning null if match fails
+            or a dictionary of matched variables bound in the pattern
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlVar.Match(NFX.Erlang.IErlObject,NFX.Erlang.ErlVarBind)">
+            <summary>
+            Perform pattern match on this Erlang term, storing matched variables
+            found in the pattern into the binding.
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlVar.Matches(NFX.Erlang.IErlObject)">
+            <summary>
+            Match this variable with given pattern merely by performing type check
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlVar.Equals(System.Object)">
+            <summary>
+            Determine if this var equals to the object
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlVar.Equals(NFX.Erlang.IErlObject)">
+            <summary>
+            Determine if two vars are equal
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlVar.GetHashCode">
+            <summary>
+            Get internal hash code
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlVar.CompareTo(System.Object)">
+            <summary>
+            Compare this instance to the object.
+            Negative value means that the atom is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlVar.CompareTo(NFX.Erlang.IErlObject)">
+            <summary>
+            Compare this instance to the IErlObject.
+            Negative value means that the atom is less than obj, positive - greater than the obj
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlVar.Clone">
+            <summary>
+            Clone an instance of the object (non-scalar immutable objects are copied by reference)
+            </summary>
+        </member>
+        <member name="P:NFX.Erlang.ErlVar.Name">
+            <summary>
+            Variable name
+            </summary>
+        </member>
+        <member name="T:NFX.Erlang.ErlVarBind">
+            <summary>
+            Dictionary of variables bound to terms
+            </summary>
+        </member>
+        <member name="M:NFX.Erlang.ErlVarBind.Add(NFX.Erlang.ErlAtom,NFX.Erlang.IErlObject)">
+            <summary>
+            Add a variable binding associating value with variable name
+            </summary>
+            <param name="name">Name of the variable</param>
+            <param name="value">Value to associate with name</param>
+        </member>
+        <member name="M:NFX.Erlang.ErlVarBind.Add(NFX.Erlang.ErlVar,System.Object)">
+            <summary>
+            Add a variable binding converting an object to variable by name
+            </summary>
+            <param name="var">Name of the variable</param>
+            <param name="o">Value to associate with name</param>
+        </member>
+        <member name="M:NFX.Erlang.ErlVarBind.Add(NFX.Erlang.ErlAtom,NFX.Erlang.ErlTypeOrder,System.Object)">
+            <summary>
+            Add a variable binding associating value with variable name
+            </summary>
+            <param name="name">Name of the variable</param>
+            <param name="et">Erlang type to use for conversion of the given CLR type</param>
+            <param name="o">Value to associate with name</param>
+        </member>
+    </members>
+</doc>
